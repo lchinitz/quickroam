@@ -1670,6 +1670,7 @@ function useDataOnly(datIn,switchText)
     if(staMAC==maxFrom) apList=mostFromPartners;
     //console.log('The list of APs this STA attaches to is ' + JSON.stringify(apList));
 
+    /*/  Or, let's not.  This doesn't seem like a great idea anymore.
     //Let's make a filtered list of packets that only involve this STA as either source or sink, depending.
     for(var i=data.length-1;i>=0;i--){
 	if(staIs=='source' && data[i].transmitterAddress!=staMAC) data.splice(i,1);
@@ -1678,6 +1679,7 @@ function useDataOnly(datIn,switchText)
 
     console.log('The number of packets that have STA ' + staMAC + ' as the ' + staIs + ' of traffic is ' + data.length);
     switchText += 'The number of packets that have STA ' + staMAC + ' as the ' + staIs + ' of traffic is ' + data.length + '<br/>';
+    //*/
 
     //Also, let's only use packets in which the source address is the same as the transmitter address, and the receiver address is the same as the destination address.  Try and keep packets going to
     //intermediate devices from messing up this analysis.
