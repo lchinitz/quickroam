@@ -1,0 +1,297 @@
+<html>
+  <head>
+    <script type="text/javascript" src="http://www.google.com/jsapi"></script>
+    <script src="quickRoamClient.js" type="text/javascript"></script>
+    
+    <script type="text/javascript" src="Blob.js"></script>
+    <script type="text/javascript" src="FileSaver.js"></script>    
+
+    <link rel="stylesheet" href="quickRoam.css">
+
+  </head>
+
+  <body onload="init()">
+    
+    <table >
+      <tr>
+	<td ><img id="logo" src="octoBox_logo_425px.png"></td>
+	<td id="title" >PCAP Analysis</td>
+      </tr>
+    </table>
+    
+    <p>&nbsp;   </p>
+    
+    <table>
+      <tr>
+	<td valign="top">
+
+	  <!-- http://54.244.182.53:8282/upload -->
+	  <!-- http://localhost:3000/upload -->
+    
+	  <!--https://gist.github.com/shobhitg/5b367f01b6daf46a0287 -->
+	  <!-- http://localhost:3000/stream -->
+
+	  <form ref='uploadForm' 
+		id='uploadForm' 
+		action='http://localhost:3000/stream' 
+		method='post' 
+		encType="multipart/form-data">
+	    <input type="file" name="sampleFile" />
+	    <input type='submit' value='Upload!' />
+	  </form>
+
+	</td>
+      </tr>
+      <tr>
+	<td valign="top">
+	  <b>Filter on packets to this MAC addres:</b>
+	  <input type="text" size="15" id="macFilter" value="04:f0:21:28:c6:80" />
+	</td>
+      </tr>
+      <tr>
+	<td align="center"><span id="statusblink"><!--Status goes here.--></span></td>
+	<td align="center"><span id="status"><!--Status goes here.--></span></td>
+      </tr>
+      <tr>
+	<td>
+	  <b>Analyze packets from:</b>
+	  <input type="text" size="15" id="minPacketToAnalyze" value="" /> to <input type="text" size="15" id="maxPacketToAnalyze" value="" />
+	</td>
+      </tr>
+      <tr>
+	<td>
+	  <span id="suggest"></span>
+	</td>
+      </tr>
+    </table>
+    
+    <table>
+      <tr>
+	<td>
+	  <span style="display:none">
+	    Select a PCAP file to import.  <input type="file" id="PCAPread" style="font-size:15px"/>
+	    <!-- There is a listener attached to this in pcapClient that causes it to do something. -->
+	  </span>
+	  Select a PCAP file to analyze:
+	  <select id="uploadFiles" onchange="getSelectedAndCallParser()">	    
+	  </select>    
+	  &nbsp;
+	  <span id='currentFile'></span>
+	  &nbsp;
+	  <br/>
+	  <table style="display:none">
+	    <tr>
+	      <td></td>
+	      <td></td>
+	      <td></td>
+	      <td span="2" style="horizontal-align:center;">Filter MACs <span id='TotalMacs'></span></td>
+	    </tr>
+	    <tr>
+	      <td>Select filters</td>
+	      <td>Filter Categories</td>
+	      <td>Filter Actions</td>
+	      <td>To MAC</td>
+	      <td>From MAC</td>
+	    </tr>
+	    <tr>
+	      <td>
+		<select id="filters" multiple>
+		  <option value="none" selected> None </option>
+		  <option value="Association request"> Association request </option>
+		  <option value="Association response"> Association response </option>
+		  <option value="Reassociation request"> Reassociation request </option>
+		  <option value="Reassociation response"> Reassociation response </option>
+		  <option value="Probe request"> Probe request </option>
+		  <option value="Probe response"> Probe response </option>
+		  <option value="Beacon"> Beacon </option>
+		  <option value="Announcement traffic indication map (ATIM)"> Announcement traffic indication map (ATIM) </option>
+		  <option value="Disassociate"> Disassociate </option>
+		  <option value="Authentication"> Authentication </option>
+		  <option value="Deauthentication"> Deauthentication </option>
+		  <option value="Action frames"> Action frames </option>
+		  <option value="Block ACK Request"> Block ACK Request </option>
+		  <option value="Block ACK"> Block ACK </option>
+		  <option value="Power-Save Poll"> Power-Save Poll </option>
+		  <option value="Request to Send"> Request to Send </option>
+		  <option value="Clear to Send"> Clear to Send </option>
+		  <option value="ACK"> ACK </option>
+		  <option value="Contention Free Period End"> Contention Free Period End </option>
+		  <option value="Contention Free Period End ACK"> Contention Free Period End ACK </option>
+		  <option value="Data"> Data </option>
+		  <option value="Data + Contention Free ACK"> Data + Contention Free ACK </option>
+		  <option value="Data + Contention Free Poll"> Data + Contention Free Poll </option>
+		  <option value="Data + Contention Free ACK + Contention Free Poll"> Data + Contention Free ACK + Contention Free Poll </option>
+		  <option value="NULL Data"> NULL Data </option>
+		  <option value="NULL Data + Contention Free ACK"> NULL Data + Contention Free ACK </option>
+		  <option value="NULL Data + Contention Free Poll"> NULL Data + Contention Free Poll </option>
+		  <option value="NULL Data + Contention Free ACK + Contention Free Poll"> NULL Data + Contention Free ACK + Contention Free Poll </option>
+		  <option value="QoS Data"> QoS Data </option>
+		  <option value="QoS Data + Contention Free ACK"> QoS Data + Contention Free ACK </option>
+		  <option value="QoS Data + Contention Free Poll"> QoS Data + Contention Free Poll </option>
+		  <option value="QoS Data + Contention Free ACK + Contention Free Poll"> QoS Data + Contention Free ACK + Contention Free Poll </option>
+		  <option value="NULL QoS Data"> NULL QoS Data </option>
+		  <option value="NULL QoS Data + Contention Free Poll"> NULL QoS Data + Contention Free Poll </option>
+		  <option value="NULL QoS Data + Contention Free ACK + Contention Free Poll"> NULL QoS Data + Contention Free ACK + Contention Free Poll </option>
+		  <option value="EAPOL"> EAPOL, EAP over LAN, 802.1X</option>
+		  <option value="Malformed Packet"> Malformed Packet</option>
+		  <option value="FromDS"> From the DS</option>
+		  <option value="ToDS"> To the DS</option>
+		</select>
+	      </td>
+	      <td>
+		<select id="categories" multiple>
+		  <option value="none" selected> None </option>
+		  <optgroup label="Action Frames">
+		    <option value="Spectrum Management"> Spectrum Management </option>
+		    <option value="QoS"> QoS </option>
+		    <option value="DLS"> DLS </option>
+		    <option value="Block ACK"> Block ACK </option>
+		    <option value="Public"> Public </option>
+		    <option value="Radio Measurement"> Radio Measurement </option>
+		    <option value="Fast BSS Transition"> Fast BSS Transition </option>
+		    <option value="HT"> HT </option>
+		    <option value="SA Query"> SA Query </option>
+		    <option value="Protected Dual of Public Action"> Protected Dual of Public Action </option>
+		    <option value="WNM"> WNM </option>
+		    <option value="Unprotected WNM"> Unprotected WNM </option>
+		    <option value="TDLS"> TDLS </option>
+		    <option value="Mesh"> Mesh </option>
+		    <option value="Multihop"> Multihop </option>
+		    <option value="Self-protected"> Self-protected </option>
+		    <option value="DMG"> DMG </option>
+		    <option value="Wi-FI Alliance"> Wi-FI Alliance </option>
+		    <option value="Fast Session Transfer"> Fast Session Transfer </option>
+		    <option value="Robust AV Streaming"> Robust AV Streaming </option>
+		    <option value="Unprotected DMG"> Unprotected DMG </option>
+		    <option value="VHT"> VHT </option>
+		  </optgroup>
+		</select>
+	      </td>
+	      <td>
+		<select id="actions" multiple>
+		  <option value="none" selected> None </option>
+		  <optgroup label="WNM">
+		    <option value="Event Request"> Event Request </option>
+		    <option value="Event Report"> Event Report" </option>
+		    <option value="Diagnostic Request"> Diagnostic Request </option>
+		    <option value="Diagnostic Report"> Diagnostic Report </option>
+		    <option value="Location Configuration Request"> Location Configuration Request </option>
+		    <option value="Location Configuration Response"> Location Configuration Response </option>
+		    <option value="BSS Transition Management Query"> BSS Transition Management Query </option>
+		    <option value="BSS Transition Management Request"> BSS Transition Management Request </option>
+		    <option value="BSS Transition Management Response"> BSS Transition Management Response </option>
+		    <option value="FMS Request"> FMS Request </option>
+		    <option value="FMS Response"> FMS Response </option>
+		    <option value="Collocated Interference Request"> Collocated Interference Request </option>
+		    <option value="Collocated Interference Report"> Collocated Interference Report </option>
+		    <option value="TFS Request"> TFS Request </option>
+		    <option value="TFS Response"> TFS Response </option>
+		    <option value="TFS Notify"> TFS Notify </option>
+		    <option value="WNM Sleep Mode Request"> WNM Sleep Mode Request </option>
+		    <option value="WNM Sleep Mode Response"> WNM Sleep Mode Response </option>
+		    <option value="TIM Broadcast Request"> TIM Broadcast Request </option>
+		    <option value="TIM Broadcast Response"> TIM Broadcast Response </option>
+		    <option value="QoS Traffic Capability Update"> QoS Traffic Capability Update </option>
+		    <option value="Channel Usage Request"> Channel Usage Request </option>
+		    <option value="Channel Usage Response"> Channel Usage Response </option>
+		    <option value="DMS Request"> DMS Request </option>
+		    <option value="DMS Response"> DMS Response </option>
+		    <option value="Timing Measurement Request"> Timing Measurement Request </option>
+		    <option value="WNM Notification Request"> WNM Notification Request </option>
+		    <option value="WNM Notification Response"> WNM Notification Response </option>
+		    <option value="WNM-Notify Response"> WNM-Notify Response </option>
+		  </optgroup>
+		  <optgroup label="Fast Session Transfer">
+		    <option value="FST Setup Request"> FST Setup Request </option>
+		    <option value="FST Setup Response"> FST Setup Response </option>
+		    <option value="FST Teardown"> FST Teardown </option>
+		    <option value="FST Ack Request"> FST Ack Request </option>
+		    <option value="FST Ack Response"> FST Ack Response </option>
+		    <option value="On-channel Tunnel Request"> On-channel Tunnel Request </option>
+		  </optgroup>
+		</select>
+	      </td>
+	      <td>	  
+		<select id="ToMacs" multiple>
+		  <option value="none" selected> None </option>
+		</select>
+	      </td>
+	      <td>	  
+		<select id="FromMacs" multiple>
+		  <option value="none" selected> None </option>
+		</select>
+	      </td>
+	    </tr>
+	  </table>
+	  <input type="button" value="to Log File" onclick="printPlot(0)"  style="display:none"/>
+	  <input type="button" value="to CSV File" onclick="printPlot(1)"  style="display:none"/>
+	</td>
+      </tr>
+
+      <tr style="display:none"><td>
+	  <!--<canvas id="messageCanvas" width="1500" height="600" style="resize:vertical; border:1px solid #d3d3d3; overflow-y: scroll;">
+	    Your browser does not support the HTML5 canvas tag.</canvas>-->
+	  <canvas id="messageCanvas" width="1500" height="0" style="resize:vertical; border:1px solid #d3d3d3; overflow-y: scroll;">
+	    Your browser does not support the HTML5 canvas tag.</canvas>
+      </td></tr>
+      <tr  style="display:none"><td>
+      	  Min: <input id="horizMin" type="text" onchange="redraw()"/>       	  Max: <input id="horizMax" type="text" onchange="redraw()"/>
+      </td></tr>
+      <tr style="display:none"><td>
+      	  <div id="Chart" style="valign:top; halign:center; display:none"></div>
+      </td></tr>
+      <tr style="display:none"><td>
+      	  <span id="Logs"></span>
+      </td></tr>
+      <tr style="display:none"><td>
+      	  <div id="FilteredPlot" style="valign:top; halign:center; display:none"></div>
+      </td></tr>
+      <tr style="display:none"><td>
+      	  <div id="RSSIChart" style="valign:top; halign:center; display:none"></div>
+      </td></tr>
+      <tr style="display:none"><td>
+      	  <div id="ChannelChart" style="valign:top; halign:center; display:none"></div>
+      </td></tr>
+      <tr style="display:none"><td>
+      	  Hist Min: <input id="histMin" type="text" onchange="rehist(1)"/>
+	  Hist Max: <input id="histMax" type="text" onchange="rehist(1)"/>
+	  Hist Bins: <input id="histBins" type="text" onchange="rehist(1)"/>
+      </td></tr>
+      <tr style="display:none"><td>
+      	  <div id="ThroughputChart" style="valign:top; halign:center; display:none"></div>
+      </td></tr>
+      <tr style="display:none"><td>
+      	  RTT Min: <input id="rttHistMin" type="text" onchange="rehist(2)"/>
+	  RTT Max: <input id="rttHistMax" type="text" onchange="rehist(2)"/>
+	  RTT Bins: <input id="rttHistBins" type="text" onchange="rehist(2)"/>
+      </td></tr>
+      <tr style="display:none"><td>
+      	  <div id="RttHist" style="valign:top; halign:center; display:none"></div>
+      </td></tr>
+      <tr style="display:none"><td>
+      	  <div id="InterPacketGap" style="valign:top; halign:center; display:none"></div>
+      </td></tr>
+      <tr style="display:none"><td>
+      	  <div id="PacketSize" style="valign:top; halign:center; display:none"></div>
+      </td></tr>
+      <tr style="display:none"><td>
+	  <span id="messageTable"></span>
+      </td></tr>
+      <tr><td>
+      	  <div id="RoamingPlot" style="valign:top; halign:center; display:none"></div>
+      </td></tr>
+      <tr><td>
+	  <span id="RoamingMessages"></span>
+      </td></tr>
+      <tr><td>
+      	  <div id="SwitchHist" style="valign:top; halign:center; display:block"></div>
+      </td></tr>
+      <tr><td>
+      	  <div id="SwitchText" style="valign:top; halign:center; display:block"></div>
+      </td></tr>
+      
+    </table>
+    
+  </body>
+
+</html>

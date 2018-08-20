@@ -1,0 +1,34 @@
+#roaming-table  table{
+border-collapse:collapse;
+}
+#roaming-table table  td {
+font-size:1.2em;
+padding:5px;
+border: black 1px solid;
+}	
+
+@keyframes blinker {
+  50% {
+    opacity: 0;
+  }
+}
+#statusblink{
+	font-weight:bold; 
+	color:#FF0000; font-size:1.5em;
+	animation: blinker 3s linear infinite;
+}
+#status{
+	font-weight:bold; 
+	color:#037A15; 
+	font-size:1.5em;
+	position:relative;
+	left:-350px;
+}
+#title {
+	position:relative:
+	right:10px;
+	font-size:48px;
+}
+#logo  {
+	width:50%;
+}
