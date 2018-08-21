@@ -590,184 +590,194 @@ function nowTheRest(uploadFiles,request,response,next){
 	    if(!allMACs.contains(packetDetails.transmitterAddress))allMACs.push(packetDetails.transmitterAddress);
 	    ipnt+=6;
 
-	    var byteArray = []; for(var i=ipnt;i<ipnt+6;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-	    if(!fcFlagObj.fromDS && !fcFlagObj.toDS){
-		packetDetails.BSSID = ''; for(var i=0;i<byteArray.length;i++) packetDetails.BSSID += byteArray[i] + '.';
-		packetDetails.destinationAddress = packetDetails.receiverAddress;
-		packetDetails.sourceAddress = packetDetails.transmitterAddress;
-	    }
-	    else if(fcFlagObj.toDS){
-		packetDetails.destinationAddress = ''; for(var i=0;i<byteArray.length;i++) packetDetails.destinationAddress += byteArray[i] + '.';
-		if(!fcFlagObj.fromDS){
-		    packetDetails.sourceAddress = packetDetails.transmitterAddress;
-		    packetDetails.BSSID = packetDetails.receiverAddress;
-		}
-	    }
-	    else if(!fcFlagObj.toDS && fcFlagObj.fromDS){
-		packetDetails.sourceAddress = ''; for(var i=0;i<byteArray.length;i++) packetDetails.sourceAddress += byteArray[i] + '.';
-		packetDetails.BSSID = packetDetails.transmitterAddress;
-		packetDetails.destinationAddress = packetDetails.receiverAddress;
-	    }
-	    ipnt+=6;
-
-	    if(fcFlagObj.fromDS && fcFlagObj.toDS){
-		var byteArray = []; for(var i=ipnt;i<ipnt+6;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		packetDetails.sourceAddress = ''; for(var i=0;i<byteArray.length;i++) packetDetails.sourceAddress += byteArray[i] + '.';
-		packetDetails.BSSID = packetDetails.transmitterAddress;
-		ipnt+=6;
+	    if(fcObj.type==1){  //These are Control Frames.  I think that in general they do not have other addresses.\
+	    	packetDetails.BSSID = 'none';
+		packetDetails.destinationAddress = 'none';
+		packetDetails.sourceAddress = 'none';
 	    }
 
-	    packetText += 'Receiver Address = '       + packetDetails.receiverAddress + '\n';
-	    packetText += 'Destination Address = '    + packetDetails.destinationAddress + '\n';
-	    packetText += 'Transmitter Address = '    + packetDetails.transmitterAddress + '\n';
-	    packetText += 'Source Address = '         + packetDetails.sourceAddress + '\n';
-	    packetText += 'BSS Id = '                 + packetDetails.BSSID + '\n';
-
-	    //There seems to be a reliable way of finding a "malformed packet"
-	    if(packetDetails.receiverAddress.indexOf('....')>=0 && packetDetails.transmitterAddress.indexOf('....')>=0) packetDetails.type = 'Malformed packet';
-
-	    //Many of the packets on the network, like ARP, LLC, Ping, etc. all come from, or to, the DS.  If you really are interested only in Wi-Fi, you might be
-	    //able to avoid those.  So make them a separate type of packet.  The ToDS and FromDS types.
-
-	    if(typeof packetDetails.type == 'undefined')packetDetails.type = '';
-
-	    if(packetDetails.type.indexOf('QoS')<0 &&
-	       packetDetails.type.indexOf('Data')<0
-	      ){
-		if(fcFlagObj.fromDS) packetDetails.type = 'FromDS';
-		if(fcFlagObj.toDS)   packetDetails.type = 'ToDS';
-	    }
-
-
-	    var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-	    packetText += 'FragSeq = ' + byteArray.toString() + '\n';
-	    var fragObj = parseFrag(byteArray);
-	    packetText += 'Fragment number = ' + fragObj.fragment + '\n';
-	    packetText += 'Sequence number = ' + fragObj.sequence + '\n';
-	    ipnt+=2;
-
-	    if(packetDetails.type=='QoS Data' ||
-	       packetDetails.type=='QoS Data + Contention Free ACK' ||
-	       packetDetails.type=='QoS Data + Contention Free Poll' ||
-	       packetDetails.type=='QoS Data + Contention Free ACK + Contention Free Poll' ||
-	       packetDetails.type=='NULL QoS Data' ||
-	       packetDetails.type=='NULL QoS Data + Contention Free Poll' ||
-	       packetDetails.type=='NULL QoS Data + Contention Free ACK + Contention Free Poll'
-	      ){
-		var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		packetText += 'QoS Control = ' + byteArray.toString() + '\n';
-		var qosObj = parseQoS(byteArray);
-		packetText += 'Qos Control Object:\n' + JSON.stringify(qosObj,null,2) + '\n';
-		ipnt+=2;
+	    else{
 		
-		var byteArray = []; for(var i=ipnt;i<ipnt+8;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		packetText += 'LLC = ' + byteArray.toString() + '\n';
-		var llcObj = decodeLLC(byteArray);
-		packetText += 'LLC decode\n' + JSON.stringify(llcObj,null,2) + '\n';
-		//if(byteArray[6]=='88' && byteArray[7]=='8e'){
-		if(llcObj.Type[0]=='88' && llcObj.Type[1]=='8e'){
-		    packetText += 'LLC indicates that this is an EAPOL packet.\n';
-		    packetDetails.type = 'EAPOL';
-		    ipnt+=8;
+		var byteArray = []; for(var i=ipnt;i<ipnt+6;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		if(!fcFlagObj.fromDS && !fcFlagObj.toDS){
+		    packetDetails.BSSID = ''; for(var i=0;i<byteArray.length;i++) packetDetails.BSSID += byteArray[i] + '.';
+		    packetDetails.destinationAddress = packetDetails.receiverAddress;
+		    packetDetails.sourceAddress = packetDetails.transmitterAddress;
 		}
-		if(llcObj.Type[0]=='08' && llcObj.Type[1]=='00'){
-		    packetText += 'LLC indicates that this is an IPv4 packet.\n';
-		    ipnt+=8;
-		    var byteArray = []; for(var i=ipnt;i<ipnt+24;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		    var ipv4Obj = parseIpv4(byteArray);
-		    packetText += 'IPv4 object:\n' + JSON.stringify(ipv4Obj,null,2) + '\n';
-		    packetDetails.type = ipv4Obj.protocolName;
-		    ipnt+=24;
-		}
-		if(llcObj.Type[0]=='08' && llcObj.Type[1]=='06'){
-		    packetText += 'LLC indicates that this is an ARP packet.\n';
-		    packetDetails.type = 'ARP';
-		    ipnt+=8;
-		}
-		else{
-		    ipnt+=8;
-		}
-	    }
-
-	    else if(packetDetails.type=='Data'){
-		var byteArray = []; for(var i=ipnt;i<ipnt+8;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		packetText += 'CCMP Initialization Vector = ' + byteArray.toString() + '\n';
-		ipnt+=8;
-		var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		packetText += 'Data = ' + byteArray.toString() + '\n';
-		ipnt+=2;
-	    }
-	    
-	    else if(packetDetails.type=='Probe request' || packetDetails.type=='Probe response'){
-		//Get the tagged parameters.  Haven't written this code yet.
-	    }
-	    else if(packetDetails.type=='Beacon'){
-		if(!fcFlagObj.protectedData){
-		    var Beacon = {fixed:{}, tagged:{}};
-		    var byteArray = []; for(var i=ipnt;i<ipnt+12;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		    Beacon.fixed.bytes = byteArray;
-		    ipnt+=12;
-		    //The remaining packets are the tagged packets.
-		    var remain = packet.data.length - ipnt;
-		    if(flagsObj.FCS) remain -= 4;  //If there is an FCS, the last 4 bytes are that.
-		    packetText += 'There are ' + remain + ' bytes of tagged packets in this beacon. \n';
-		    var byteArray = []; for(var i=ipnt;i<ipnt+remain;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		    Beacon.tagged.bytes = byteArray;
-		    ipnt+=remain;
-		    Beacon.tagged = decodeBeaconTagged(Beacon);
-		    packetText += 'Found beacon ' + JSON.stringify(Beacon.tagged.tags,null,2);
-		    var csa = Beacon.tagged.tags.locate("Channel Switch Announcement");
-		    if(csa>=0){
-			var toChannel = parseInt(Beacon.tagged.tags[csa].bytes[1],16);
-			var dsp = Beacon.tagged.tags.locate("DS Parameter Set");
-			var fromChannel = null;
-			if(dsp>=0) fromChannel = parseInt(Beacon.tagged.tags[dsp].bytes[0],16);
-			packetText += 'Channel Switch Announcement going to channel ' + toChannel + ' from ' + fromChannel + '. \n';
+		else if(fcFlagObj.toDS){
+		    packetDetails.destinationAddress = ''; for(var i=0;i<byteArray.length;i++) packetDetails.destinationAddress += byteArray[i] + '.';
+		    if(!fcFlagObj.fromDS){
+			packetDetails.sourceAddress = packetDetails.transmitterAddress;
+			packetDetails.BSSID = packetDetails.receiverAddress;
 		    }
 		}
-		else if(fcFlagObj.protectedData){
-		    //This stuff is WEP stuff.
-		    var Beacon={};
-		    packetText += 'This packet is WEP protected.  See the protectedData flag above. \n';
-		    var byteArray = []; for(var i=ipnt;i<ipnt+3;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		    Beacon.wepParameters = byteArray;
-		    packetText += 'WEP parameters are ' + Beacon.wepParameters + '\n';
-		    ipnt+=3;
-		    var byteArray = []; for(var i=ipnt;i<ipnt+1;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		    Beacon.keyIndex = byteArray;
-		    packetText += 'Key Index is ' + Beacon.keyIndex + '\n';
-		    ipnt+=1;
-		    //The remaining packets are the data.
-		    var remain = packet.data.length - ipnt;
-		    remain -= 4;  //The last 4 bytes are the ICV
-		    var byteArray = []; for(var i=ipnt;i<ipnt+remain;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		    Beacon.data = byteArray;
-		    ipnt+=remain;
-		    var byteArray = []; for(var i=ipnt;i<ipnt+4;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		    Beacon.ICV = byteArray;		    		    
-		    packetText += 'ICV is ' + Beacon.ICV + '\n';
-		    packetText += 'There are ' + remain + ' bytes of protected data:  ' + Beacon.data + '\n';
+		else if(!fcFlagObj.toDS && fcFlagObj.fromDS){
+		    packetDetails.sourceAddress = ''; for(var i=0;i<byteArray.length;i++) packetDetails.sourceAddress += byteArray[i] + '.';
+		    packetDetails.BSSID = packetDetails.transmitterAddress;
+		    packetDetails.destinationAddress = packetDetails.receiverAddress;
 		}
-	    }
+		ipnt+=6;
 
-	    else if(packetDetails.type=='Action frames'){
+		if(fcFlagObj.fromDS && fcFlagObj.toDS){
+		    var byteArray = []; for(var i=ipnt;i<ipnt+6;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		    packetDetails.sourceAddress = ''; for(var i=0;i<byteArray.length;i++) packetDetails.sourceAddress += byteArray[i] + '.';
+		    packetDetails.BSSID = packetDetails.transmitterAddress;
+		    ipnt+=6;
+		}
 
-		var categoryCode = packet.data.slice(ipnt,ipnt+1).toString("hex");
-		packetText += 'categoryCode = ' + categoryCode + '\n';
-		var category = decodeCategory(categoryCode);
-		packetText += 'Category = ' + category + '\n';
-		packetDetails.category = category;
-		ipnt++;
+		packetText += 'Receiver Address = '       + packetDetails.receiverAddress + '\n';
+		packetText += 'Destination Address = '    + packetDetails.destinationAddress + '\n';
+		packetText += 'Transmitter Address = '    + packetDetails.transmitterAddress + '\n';
+		packetText += 'Source Address = '         + packetDetails.sourceAddress + '\n';
+		packetText += 'BSS Id = '                 + packetDetails.BSSID + '\n';
+
+		//There seems to be a reliable way of finding a "malformed packet"
+		if(packetDetails.receiverAddress.indexOf('....')>=0 && packetDetails.transmitterAddress.indexOf('....')>=0) packetDetails.type = 'Malformed packet';
+
+		//Many of the packets on the network, like ARP, LLC, Ping, etc. all come from, or to, the DS.  If you really are interested only in Wi-Fi, you might be
+		//able to avoid those.  So make them a separate type of packet.  The ToDS and FromDS types.
+
+		if(typeof packetDetails.type == 'undefined')packetDetails.type = '';
+
+		if(packetDetails.type.indexOf('QoS')<0 &&
+		   packetDetails.type.indexOf('Data')<0
+		  ){
+		    if(fcFlagObj.fromDS) packetDetails.type = 'FromDS';
+		    if(fcFlagObj.toDS)   packetDetails.type = 'ToDS';
+		}
+
+
+		var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		packetText += 'FragSeq = ' + byteArray.toString() + '\n';
+		var fragObj = parseFrag(byteArray);
+		packetText += 'Fragment number = ' + fragObj.fragment + '\n';
+		packetText += 'Sequence number = ' + fragObj.sequence + '\n';
+		ipnt+=2;
+
+		if(packetDetails.type=='QoS Data' ||
+		   packetDetails.type=='QoS Data + Contention Free ACK' ||
+		   packetDetails.type=='QoS Data + Contention Free Poll' ||
+		   packetDetails.type=='QoS Data + Contention Free ACK + Contention Free Poll' ||
+		   packetDetails.type=='NULL QoS Data' ||
+		   packetDetails.type=='NULL QoS Data + Contention Free Poll' ||
+		   packetDetails.type=='NULL QoS Data + Contention Free ACK + Contention Free Poll'
+		  ){
+		    var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		    packetText += 'QoS Control = ' + byteArray.toString() + '\n';
+		    var qosObj = parseQoS(byteArray);
+		    packetText += 'Qos Control Object:\n' + JSON.stringify(qosObj,null,2) + '\n';
+		    ipnt+=2;
+		    
+		    var byteArray = []; for(var i=ipnt;i<ipnt+8;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		    packetText += 'LLC = ' + byteArray.toString() + '\n';
+		    var llcObj = decodeLLC(byteArray);
+		    packetText += 'LLC decode\n' + JSON.stringify(llcObj,null,2) + '\n';
+		    //if(byteArray[6]=='88' && byteArray[7]=='8e'){
+		    if(llcObj.Type[0]=='88' && llcObj.Type[1]=='8e'){
+			packetText += 'LLC indicates that this is an EAPOL packet.\n';
+			packetDetails.type = 'EAPOL';
+			ipnt+=8;
+		    }
+		    if(llcObj.Type[0]=='08' && llcObj.Type[1]=='00'){
+			packetText += 'LLC indicates that this is an IPv4 packet.\n';
+			ipnt+=8;
+			var byteArray = []; for(var i=ipnt;i<ipnt+24;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+			var ipv4Obj = parseIpv4(byteArray);
+			packetText += 'IPv4 object:\n' + JSON.stringify(ipv4Obj,null,2) + '\n';
+			packetDetails.type = ipv4Obj.protocolName;
+			ipnt+=24;
+		    }
+		    if(llcObj.Type[0]=='08' && llcObj.Type[1]=='06'){
+			packetText += 'LLC indicates that this is an ARP packet.\n';
+			packetDetails.type = 'ARP';
+			ipnt+=8;
+		    }
+		    else{
+			ipnt+=8;
+		    }
+		}
+
+		else if(packetDetails.type=='Data'){
+		    var byteArray = []; for(var i=ipnt;i<ipnt+8;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		    packetText += 'CCMP Initialization Vector = ' + byteArray.toString() + '\n';
+		    ipnt+=8;
+		    var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		    packetText += 'Data = ' + byteArray.toString() + '\n';
+		    ipnt+=2;
+		}
 		
-		//Ouch.  There are different action codes for each of these categories.  Might just have to pick the interesting ones for now.
+		else if(packetDetails.type=='Probe request' || packetDetails.type=='Probe response'){
+		    //Get the tagged parameters.  Haven't written this code yet.
+		}
+		else if(packetDetails.type=='Beacon'){
+		    if(!fcFlagObj.protectedData){
+			var Beacon = {fixed:{}, tagged:{}};
+			var byteArray = []; for(var i=ipnt;i<ipnt+12;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+			Beacon.fixed.bytes = byteArray;
+			ipnt+=12;
+			//The remaining packets are the tagged packets.
+			var remain = packet.data.length - ipnt;
+			if(flagsObj.FCS) remain -= 4;  //If there is an FCS, the last 4 bytes are that.
+			packetText += 'There are ' + remain + ' bytes of tagged packets in this beacon. \n';
+			var byteArray = []; for(var i=ipnt;i<ipnt+remain;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+			Beacon.tagged.bytes = byteArray;
+			ipnt+=remain;
+			Beacon.tagged = decodeBeaconTagged(Beacon);
+			packetText += 'Found beacon ' + JSON.stringify(Beacon.tagged.tags,null,2);
+			var csa = Beacon.tagged.tags.locate("Channel Switch Announcement");
+			if(csa>=0){
+			    var toChannel = parseInt(Beacon.tagged.tags[csa].bytes[1],16);
+			    var dsp = Beacon.tagged.tags.locate("DS Parameter Set");
+			    var fromChannel = null;
+			    if(dsp>=0) fromChannel = parseInt(Beacon.tagged.tags[dsp].bytes[0],16);
+			    packetText += 'Channel Switch Announcement going to channel ' + toChannel + ' from ' + fromChannel + '. \n';
+			}
+		    }
+		    else if(fcFlagObj.protectedData){
+			//This stuff is WEP stuff.
+			var Beacon={};
+			packetText += 'This packet is WEP protected.  See the protectedData flag above. \n';
+			var byteArray = []; for(var i=ipnt;i<ipnt+3;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+			Beacon.wepParameters = byteArray;
+			packetText += 'WEP parameters are ' + Beacon.wepParameters + '\n';
+			ipnt+=3;
+			var byteArray = []; for(var i=ipnt;i<ipnt+1;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+			Beacon.keyIndex = byteArray;
+			packetText += 'Key Index is ' + Beacon.keyIndex + '\n';
+			ipnt+=1;
+			//The remaining packets are the data.
+			var remain = packet.data.length - ipnt;
+			remain -= 4;  //The last 4 bytes are the ICV
+			var byteArray = []; for(var i=ipnt;i<ipnt+remain;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+			Beacon.data = byteArray;
+			ipnt+=remain;
+			var byteArray = []; for(var i=ipnt;i<ipnt+4;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+			Beacon.ICV = byteArray;		    		    
+			packetText += 'ICV is ' + Beacon.ICV + '\n';
+			packetText += 'There are ' + remain + ' bytes of protected data:  ' + Beacon.data + '\n';
+		    }
+		}
+
+		else if(packetDetails.type=='Action frames'){
+
+		    var categoryCode = packet.data.slice(ipnt,ipnt+1).toString("hex");
+		    packetText += 'categoryCode = ' + categoryCode + '\n';
+		    var category = decodeCategory(categoryCode);
+		    packetText += 'Category = ' + category + '\n';
+		    packetDetails.category = category;
+		    ipnt++;
+		    
+		    //Ouch.  There are different action codes for each of these categories.  Might just have to pick the interesting ones for now.
+		    
+		    var actionCode = packet.data.slice(ipnt,ipnt+1).toString("hex");
+		    packetText += 'actionCode = ' + actionCode + '\n';
+		    var action = decodeActionCode(categoryCode,actionCode);
+		    packetText += 'Action= ' + action + '\n';
+		    packetDetails.action = action;
+		    ipnt++;
+		}
 		
-		var actionCode = packet.data.slice(ipnt,ipnt+1).toString("hex");
-		packetText += 'actionCode = ' + actionCode + '\n';
-		var action = decodeActionCode(categoryCode,actionCode);
-		packetText += 'Action= ' + action + '\n';
-		packetDetails.action = action;
-		ipnt++;
-	    }	
+	    } //This is for management and data frames
 
 
 	    var returnPacket = {
@@ -859,7 +869,7 @@ function nowTheRest(uploadFiles,request,response,next){
 		
 		returnFields.push(returnPacket);
 	    }
-	    if(packetNumber== -2429) console.log(packetText);     //Write out packet here.
+	    if(packetNumber== -4177) console.log(packetText);     //Write out packet here.
 	    allPackets.push(returnPacket);
 	}
     });
