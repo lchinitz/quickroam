@@ -1980,22 +1980,38 @@ function makeRoamingPlot(allPackets)
     }
     //*/
 
-    var colors = ['green', 'red', 'black', 'orange'];
-
+    var colors = ['green', 'red', 'black', 'orange', 'yellow', 'gray'];
+    
     var series = {};
     if(groupByMac){
-    for(var g=0;g<groups.length;g++){
-	if(groups[g][0].Channel<3000) series[g] = {lineWidth:3, color:'green'};
-	if(groups[g][0].Channel>3000) series[g] = {lineWidth:3, color:'red'};
-    }
+	for(var g=0;g<groups.length;g++){
+	    var pick = g % colors.length;
+	    var color = colors[pick];
+	    var lineWidth, pointShape, pointSize;
+	    if(groups[g][0].Channel<3000){
+		lineWidth = 1;
+		pointShape = 'circle';
+		pointSize = 5;
+	    }
+	    if(groups[g][0].Channel>3000){
+		lineWidth = 8;
+		pointShape = 'diamond';
+		pointSize = 20;
+	    }
+	    series[g] = {lineWidth:lineWidth, color:color, pointShape:pointShape, pointSize:pointSize};
+	    /*/
+	    if(groups[g][0].Channel<3000) series[g] = {lineWidth:3, color:'green'};
+	    if(groups[g][0].Channel>3000) series[g] = {lineWidth:3, color:'red'};
+	    //*/
+	}
     }
     else{
-    for(var g=0;g<groups.length;g++){
-	var pick = g % 4;
-	series[g] = {color: colors[pick]};
+	for(var g=0;g<groups.length;g++){
+	    var pick = g % colors.length;
+	    series[g] = {color: colors[pick]};
+	}
     }
-    }
-
+    
     //This one is the last series with the roaming events in it.
     series[groups.length] = {color:'blue'};
 
