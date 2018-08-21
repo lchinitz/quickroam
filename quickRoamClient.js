@@ -65,6 +65,8 @@ function init()
             if (xhttp.readyState == 4 && xhttp.status == 200) {
 		var json = JSON.parse(xhttp.response);
 		var uploadFiles = json.uploadFiles;
+		uploadFiles.sort();
+		uploadFiles.reverse();
 		var html = '<option value="select" selected> Select one of these, or upload a new one </option>';
 		for(var i=0;i<uploadFiles.length;i++){
 		    if(uploadFiles[i].length>0)
