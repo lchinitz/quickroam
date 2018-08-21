@@ -1820,6 +1820,8 @@ function showPacketSize(json)
 function makeRoamingPlot(allPackets)
 {
 
+    var groupByMac = true;
+
     var roamThisMAC = theMacFilter;
 
     var rssiEvents = doRoamingPlotFilters(allPackets,roamThisMAC);        
@@ -1879,6 +1881,7 @@ function makeRoamingPlot(allPackets)
     }
     for(var i=0;i<rssiEvents.length;i++) if(bssIDs.contains(rssiEvents[i].bssID)<0) bssIDs.push(rssiEvents[i].bssID);
 
+    if(groupByMac){
     //For each mac address, create separate groups of data based on the channel.
     var groups = [];
     var set = [];
@@ -1901,14 +1904,32 @@ function makeRoamingPlot(allPackets)
 	}
     }
     if(set.length>0) groups.push(set);
-
     if(groups.length>100)groups.length=100;
+    }
+
+    else{    
+    //For each BSSID, create separate groups of data
+    var groups = [];
+    var set = [];
+    for(var b=0;b<bssIDs.length;b++){
+	set = [];
+	for(var f=0;f<rssiEvents.length;f++){
+	    if(rssiEvents[f].bssID!=bssIDs[b]) continue;
+	    set.push(rssiEvents[f]);
+	}
+	groups.push(set);
+    }
+    if(groups.length>100)groups.length=100;
+    }
     
     document.getElementById('RoamingPlot').style.display = "block";
     var data = new google.visualization.DataTable();
     data.addColumn('number', 'Time Delta');
     for(var g=0;g<groups.length;g++){
-	data.addColumn('number' , 'RSSI for packets from ' + groups[g][0].transmitterAddress + 'to ' + groups[g][0].receiverAddress);
+	if(groupByMac)
+	    data.addColumn('number' , 'RSSI for packets from ' + groups[g][0].transmitterAddress + 'to ' + groups[g][0].receiverAddress);
+	else
+	    data.addColumn('number' , 'RSSI for packets from BSSID ' + groups[g][0].bssID);	    
 	data.addColumn({type: 'string', role: 'tooltip'});
     }
     data.addColumn('number' , 'RSSI for roaming packets');
@@ -1959,11 +1980,23 @@ function makeRoamingPlot(allPackets)
     }
     //*/
 
+    var colors = ['green', 'red', 'black', 'orange'];
+
     var series = {};
+    if(groupByMac){
     for(var g=0;g<groups.length;g++){
 	if(groups[g][0].Channel<3000) series[g] = {lineWidth:3, color:'green'};
 	if(groups[g][0].Channel>3000) series[g] = {lineWidth:3, color:'red'};
     }
+    }
+    else{
+    for(var g=0;g<groups.length;g++){
+	var pick = g % 4;
+	series[g] = {color: colors[pick]};
+    }
+    }
+
+    //This one is the last series with the roaming events in it.
     series[groups.length] = {color:'blue'};
 
     var title = row-1 + ' packets selected by the filters';
