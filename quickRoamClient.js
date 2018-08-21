@@ -2013,7 +2013,7 @@ function makeRoamingPlot(allPackets)
     }
     
     //This one is the last series with the roaming events in it.
-    series[groups.length] = {color:'blue'};
+    series[groups.length] = {color:'blue', pointShape: {type:'star', sides:5, dent:0.05}, pointSize:20};
 
     var title = row-1 + ' packets selected by the filters';
     var chart = new google.visualization.ComboChart(document.getElementById('RoamingPlot'));
