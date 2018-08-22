@@ -93,7 +93,7 @@ function readFile(evt)
     fileList.length=0;  for(var i=0;i<evt.target.files.length;i++)fileList.push(evt.target.files[i]);
     var f = fileList[0];
     var fileName = f.name;
-    alert('The file to parse is ' + fileName);
+    //alert('The file to parse is ' + fileName);
     document.getElementById('currentFile').innerHTML = fileName;
     document.getElementById("PCAPread").value = null;
     callParser(fileName);
@@ -530,6 +530,11 @@ function writeMessages(list)
 	var deltamsec = deltamicrosec/1000;
 	var deltasec = deltamicrosec/1E6;
 	deltasec = list[l].arrivalTimeSeconds - holdJson.firstArrivalTime;
+
+	var catText = '--';
+	if(typeof list[l].packetCategory != 'undefined') catText = list[l].packetCategory;
+	var actText = '--';
+	if(typeof list[l].packetAction != 'undefined') actText = list[l].packetAction;
 	
 	html += '<td>' + list[l].packetNumber + '</td>';
 	//html += '<td>' + list[l].macTimestamp + '</td>';
@@ -541,8 +546,8 @@ function writeMessages(list)
 	html += '<td>' + channelToNumber(list[l].Channel) + '</td>';	
 	html += '<td>' + list[l].RSSI + '</td>';
 	html += '<td>' + list[l].packetType + '</td>';
-	html += '<td>' + list[l].packetCategory + '</td>';
-	html += '<td>' + list[l].packetAction + '</td>';
+	html += '<td>' + catText + '</td>';
+	html += '<td>' + actText + '</td>';
 	html += '<td>' + list[l].MCS + '</td>';
 	html += '<td>' + list[l].NSS + '</td>';
 	html += '<td>' + list[l].BW + '</td>';
@@ -1981,6 +1986,7 @@ function makeRoamingPlot(allPackets)
     //*/
 
     var colors = ['green', 'red', 'black', 'orange', 'yellow', 'gray'];
+    colors.length = 4;
     
     var series = {};
     if(groupByMac){
@@ -2013,7 +2019,7 @@ function makeRoamingPlot(allPackets)
     }
     
     //This one is the last series with the roaming events in it.
-    series[groups.length] = {color:'blue', pointShape: {type:'star', sides:5, dent:0.05}, pointSize:20};
+    series[groups.length] = {color:'blue', pointShape: {type:'star', sides:5, dent:0.05}, pointSize:10};
 
     var title = row-1 + ' packets selected by the filters';
     var chart = new google.visualization.ComboChart(document.getElementById('RoamingPlot'));
@@ -2192,6 +2198,11 @@ function makeRoamingTable(allPackets)
 	var deltasec = deltamicrosec/1E6;
 	deltasec = tableEvents[l].arrivalTimeSeconds - holdJson.firstArrivalTime;
 	
+	var catText = '--';
+	if(typeof tableEvents[l].packetCategory != 'undefined') catText = tableEvents[l].packetCategory;
+	var actText = '--';
+	if(typeof tableEvents[l].packetAction != 'undefined') actText = tableEvents[l].packetAction;
+
 	html += '<td>' + tableEvents[l].packetNumber + '</td>';
 	//html += '<td>' + tableEvents[l].macTimestamp + '</td>';
 	html += '<td>' + tableEvents[l].arrivalTimeSeconds + '</td>';
@@ -2202,8 +2213,8 @@ function makeRoamingTable(allPackets)
 	html += '<td>' + channelToNumber(tableEvents[l].Channel) + '</td>';	
 	html += '<td>' + tableEvents[l].RSSI + '</td>';
 	html += '<td>' + tableEvents[l].packetType + '</td>';
-	html += '<td>' + tableEvents[l].packetCategory + '</td>';
-	html += '<td>' + tableEvents[l].packetAction + '</td>';
+	html += '<td>' + catText + '</td>';
+	html += '<td>' + actText + '</td>';
 	/*/
 	html += '<td>' + tableEvents[l].MCS + '</td>';
 	html += '<td>' + tableEvents[l].NSS + '</td>';
