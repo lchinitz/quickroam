@@ -114,7 +114,7 @@ function getSelectedAndCallParser()
 	}
     }
 
-    alert('The file to parse is ' + fileName);
+    //alert('The file to parse is ' + fileName);
     document.getElementById('currentFile').innerHTML = fileName;
     document.getElementById("uploadFiles").value = 'select';
     callParser(fileName);
@@ -1872,7 +1872,7 @@ function makeRoamingPlot(allPackets)
 	}
 	return index;
     }
-    for(var i=0;i<rssiEvents.length;i++) if(macs.contains(rssiEvents[i].receiverAddress)<0) macs.push(rssiEvents[i].receiverAddress);
+    for(var i=0;i<rssiEvents.length;i++) if(macs.contains(rssiEvents[i].transmitterAddress)<0) macs.push(rssiEvents[i].transmitterAddress);
     var bssIDs = [];
     bssIDs.contains = function(x){
 	var index = -1;
@@ -1887,44 +1887,69 @@ function makeRoamingPlot(allPackets)
     for(var i=0;i<rssiEvents.length;i++) if(bssIDs.contains(rssiEvents[i].bssID)<0) bssIDs.push(rssiEvents[i].bssID);
 
     if(groupByMac){
-    //For each mac address, create separate groups of data based on the channel.
-    var groups = [];
-    var set = [];
-    for(var m=0;m<macs.length;m++){
-	var previous = null;
+	//For each mac address, create separate groups of data based on the channel.
+	/*/
+	var groups = [];
+	var set = [];
+	for(var m=0;m<macs.length;m++){
+	    var previous = null;
+	    if(set.length>0) groups.push(set);
+	    set = [];
+	    for(var f=0;f<rssiEvents.length;f++){
+		if(rssiEvents[f].transmitterAddress!=macs[m]) continue;
+		if(rssiEvents[f].Channel != previous){
+		    //if(false){
+		    if(set.length>0) groups.push(set);
+		    set = [];
+		    set.push(rssiEvents[f]);
+		    previous = rssiEvents[f].Channel;
+		}
+		else{
+		    set.push(rssiEvents[f]);
+		}
+	    }
+	}
 	if(set.length>0) groups.push(set);
-	set = [];
+	if(groups.length>100)groups.length=100;
+	//*/
+	var thisMac=null;
+	var thisChannel=null;
+	var groups = [];
+	var set = [];
 	for(var f=0;f<rssiEvents.length;f++){
-	    if(rssiEvents[f].receiverAddress!=macs[m]) continue;
-	    if(rssiEvents[f].Channel != previous){
-	    //if(false){
-		if(set.length>0) groups.push(set);
-		set = [];
+	    if(thisMac==null)thisMac=rssiEvents[f].transmitterAddress;
+	    if(thisChannel==null)thisChannel=rssiEvents[f].Channel;
+	    if(rssiEvents[f].transmitterAddress!=thisMac || rssiEvents[f].Channel!=thisChannel){ //Move to a new set.
+		if(set.length>0)groups.push(set);
+		set=[];
 		set.push(rssiEvents[f]);
-		previous = rssiEvents[f].Channel;
+		thisMac=rssiEvents[f].transmitterAddress;
+		thisChannel=rssiEvents[f].Channel;
 	    }
-	    else{
+	    else{ //This means that this is the same MAC and Channel as you were on in the last packet.
 		set.push(rssiEvents[f]);
 	    }
 	}
+	if(set.length>0)groups.push(set);
     }
-    if(set.length>0) groups.push(set);
-    if(groups.length>100)groups.length=100;
-    }
-
+    
     else{    
-    //For each BSSID, create separate groups of data
-    var groups = [];
-    var set = [];
-    for(var b=0;b<bssIDs.length;b++){
-	set = [];
-	for(var f=0;f<rssiEvents.length;f++){
-	    if(rssiEvents[f].bssID!=bssIDs[b]) continue;
-	    set.push(rssiEvents[f]);
+	//For each BSSID, create separate groups of data
+	//var tArr = bssIDs;
+	var tArr = macs;
+	var groups = [];
+	var set = [];
+	for(var b=0;b<tArr.length;b++){
+	    set = [];
+	    for(var f=0;f<rssiEvents.length;f++){
+		//var val = rssiEvents[f].bssID;
+		var val = rssiEvents[f].receiverAddress;
+		if(val!=tArr[b]) continue;
+		set.push(rssiEvents[f]);
+	    }
+	    groups.push(set);
 	}
-	groups.push(set);
-    }
-    if(groups.length>100)groups.length=100;
+	if(groups.length>100)groups.length=100;
     }
     
     document.getElementById('RoamingPlot').style.display = "block";
@@ -2042,11 +2067,24 @@ function doRoamingPlotFilters(allPackets,roamThisMAC)
 {
     var filters = [];
     filters.length = 0;
+    filters.push('Data');
+    filters.push('Data + Contention Free ACK');
+    filters.push('Data + Contention Free Poll');
+    filters.push('Data + Contention Free ACK + Contention Free Poll');
+    filters.push('NULL Data');
+    filters.push('NULL Data + Contention Free ACK');
+    filters.push('NULL Data + Contention Free Poll');
+    filters.push('NULL Data + Contention Free ACK + Contention Free Poll');
     filters.push('QoS Data');
+    filters.push('QoS Data + Contention Free ACK');
+    filters.push('QoS Data + Contention Free Poll');
+    filters.push('QoS Data + Contention Free ACK + Contention Free Poll');
     filters.push('NULL QoS Data');
+    filters.push('NULL QoS Data + Contention Free Poll');
+    filters.push('NULL QoS Data + Contention Free ACK + Contention Free Poll');
     filters.push('EAPOL');
     filters.push('Block ACK');
-    filters.push('Probe response');
+    //filters.push('Probe response');
     filters.contains = function(x){
 	var contains = false;
 	for(var i=0;i<filters.length;i++){
