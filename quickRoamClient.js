@@ -360,7 +360,10 @@ function recombineArray(jsonArray)
 {
     var json = {};
 
-    json.firstArrivalTime = jsonArray[0].firstArrivalTime;
+    json.firstArrivalTime = null;
+    for(var i=0;i<jsonArray.length;i++){
+	if(json.firstArrivalTime==null) json.firstArrivalTime = jsonArray[i].firstArrivalTime;
+    }
     json.roamThisMAC = jsonArray[0].roamThisMAC;
     
     json.fields = [];
@@ -1981,7 +1984,8 @@ function makeRoamingPlot(allPackets)
 	    data.setValue(row,step+2,'Packet #: ' + groups[g][i].packetNumber + ', Arrival time: ' + delta.toFixed(3) + ', RSSI: ' +
 			  groups[g][i].RSSI + ', Channel: ' + channelToNumber(groups[g][i].Channel));
 	    //*/
-	    data.setValue(row,step+2,'Packet #: ' + groups[g][i].packetNumber + ', From MAC: ' + groups[g][i].transmitterAddress + ' RSSI: ' + 
+	    data.setValue(row,step+2,'Packet #: ' + groups[g][i].packetNumber + ', Time: ' + delta.toFixed(1) + ' sec, From MAC: ' +
+			  groups[g][i].transmitterAddress + ' RSSI: ' + 
 			  groups[g][i].RSSI + ' dBm, Channel: ' + channelToNumber(groups[g][i].Channel) + ' BSSID: ' + groups[g][i].bssID);
 	    row++;
 	}
