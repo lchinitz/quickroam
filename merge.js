@@ -1,7 +1,19 @@
 var baseURL = "http://localhost:3000/parsePCAP/";
+var url, domain;
 //...............................................................
 function init()
 {
+
+    //Get the correct domain
+    url = window.location.href;
+    domain = url.split('//')[1];
+    domain = domain.split('/')[0];
+    
+    baseURL = 'http://' + domain + '/parsePCAP';
+    //change the form action URL
+    uploadURL = 'http://'+domain+'/stream';
+    document.getElementById("uploadForm").action = uploadURL;
+    //alert('uploadURL='+uploadURL);
 
     var xhttp = new XMLHttpRequest();
     var url = baseURL;
