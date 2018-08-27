@@ -36,6 +36,7 @@ app.use(fileUpload({
 //*/
 
 app.get('/',homePage);
+app.get('/merge',merge);
 app.post('/parsePCAP/', parsePCAP);
 app.get('/parsePCAP/', parsePCAP);
 
@@ -120,6 +121,19 @@ function homePage(req,res,next)
     console.log('Request body is ' + JSON.stringify(req.null,2));
 
     var html = fs.readFileSync('./index.html');
+    res.writeHead(200, {'Content-type': 'text/html'} );
+    res.end(html);
+
+    return;
+}
+//.................................................
+function merge(req,res,next)
+{
+
+    console.log('... load the merge page ... ' );
+    console.log('Request body is ' + JSON.stringify(req.null,2));
+
+    var html = fs.readFileSync('./merge.html');
     res.writeHead(200, {'Content-type': 'text/html'} );
     res.end(html);
 
@@ -367,19 +381,32 @@ function nowTheRest(uploadFiles,request,response,next){
 	    
 	    var ipnt = 0;
 	    
+	    var countHeaderBytes = 0;
+	    var skip1 = 23;
+	    
 	    var radiotapVersion = packet.data.slice(ipnt,ipnt+1).toString("hex");
 	    packetText += 'Radiotap Version = ' + radiotapVersion + '\n';
 	    ipnt++;
+	    countHeaderBytes += 1;
+	    packetText += '********** Up to byte ' + countHeaderBytes + ' of the header. ' + radiotapVersion + '\n';
+	    if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
 	    
 	    var radiotapPad = packet.data.slice(ipnt,ipnt+1).toString("hex");
 	    packetText += 'Radiotap Pad = ' + radiotapPad + '\n';
 	    ipnt++;
+	    countHeaderBytes += 1;	    
+	    packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + radiotapPad + '\n';
+	    if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
 	    
 	    var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
 	    packetText += 'Header Length = ' + byteArray.toString() + '\n';
 	    var headerLength = parseInt(byteArray[0],16) + parseInt(byteArray[1],16)*Math.pow(16,2);
 	    packetText += 'Header Length = ' + headerLength + '\n';
 	    ipnt +=2;
+	    countHeaderBytes += 2;
+	    packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + byteArray + '\n';
+	    if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
+	    
 	    
 	    var byteArray = []; for(var i=ipnt;i<ipnt+4;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
 	    packetText += 'Present = ' + byteArray.toString() + '\n';
@@ -388,6 +415,9 @@ function nowTheRest(uploadFiles,request,response,next){
 	    packetText += 'Present word= ' + presentWord + '\n';
 	    //packetText += JSON.stringify(presentObj,null,2);
 	    ipnt +=4;
+	    countHeaderBytes += 4;
+	    packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + byteArray + '\n';
+	    if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
 
 	    if(presentObj.TSFT){
 		var byteArray = []; for(var i=ipnt;i<ipnt+8;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
@@ -397,38 +427,74 @@ function nowTheRest(uploadFiles,request,response,next){
 		packetText += 'MAC timestamp = ' + macTimestamp + '\n';
 		if(firstTimestamp==null)firstTimestamp = macTimestamp;
 		ipnt+=8;
+		countHeaderBytes += 8;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + byteArray + '\n';		
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
+	    }
+
+	    if(presentObj.Flags){
+		var radiotapFlags = packet.data.slice(ipnt,ipnt+1).toString("hex");
+		packetText += 'Radiotap Flags = ' + radiotapFlags + '\n';
+		var GI = 800;
+		var flagsObj = parseFlags(radiotapFlags);
+		if(flagsObj.ShortGI) GI = 400;
+		packetText += JSON.stringify(flagsObj,null,2) + '\n';
+		ipnt++;
+		countHeaderBytes += 1;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + radiotapFlags + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
+	    }
+	    else{
+		var flagsObj = {};
 	    }
 	    
-	    var radiotapFlags = packet.data.slice(ipnt,ipnt+1).toString("hex");
-	    packetText += 'Radiotap Flags = ' + radiotapFlags + '\n';
-	    var GI = 800;
-	    var flagsObj = parseFlags(radiotapFlags);
-	    if(flagsObj.ShortGI) GI = 400;
-	    packetText += JSON.stringify(flagsObj,null,2) + '\n';
-	    ipnt++;
-	    
-	    var dataRate = packet.data.slice(ipnt,ipnt+1).toString("hex");
-	    packetText += 'Data Rate (hex) = ' + dataRate + '\n';
-	    dataRate = parseInt(dataRate,16);  //Measured in 500 kbps steps
-	    dataRate *= 500; //kbps
-	    dataRate /=1000; //Mbps
-	    packetText += 'Data Rate = ' + dataRate + ' Mbps\n';
-	    ipnt++;
-	    
-	    var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-	    packetText += 'Channel frequency (hex) = ' + byteArray.toString() + '\n';
-	    var channelFrequency = 0;
-	    for(var i=0;i<byteArray.length;i++) channelFrequency += parseInt(byteArray[i],16) * Math.pow(16,2*i) ;
-	    packetText += 'Channel Frequency = ' + channelFrequency + ' MHz\n';
-	    
-	    ipnt+=2;
-	    
-	    var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-	    packetText += 'Channel flags = ' + byteArray.toString() + '\n';
-	    var channelObj = parseChannel(byteArray);
-	    packetText += JSON.stringify(channelObj,null,2) + '\n';
-	    ipnt+=2;
+	    if(presentObj.Rate){
+		var dataRate = packet.data.slice(ipnt,ipnt+1).toString("hex");
+		packetText += 'Data Rate (hex) = ' + dataRate + '\n';
+		dataRate = parseInt(dataRate,16);  //Measured in 500 kbps steps
+		dataRate *= 500; //kbps
+		dataRate /=1000; //Mbps
+		packetText += 'Data Rate = ' + dataRate + ' Mbps\n';
+		ipnt++;
+		countHeaderBytes += 1;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + dataRate + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
+	    }
 
+	    if(presentObj.Channel){
+		//Maybe it's Channel that identifies this byte that needs to be skipped.  Or the combination of this and rate?
+		if(!presentObj.Rate){
+		    ipnt++;
+		    countHeaderBytes += 1;
+		    packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + ' Skipping channel byte.' + '\n';
+		    if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
+		}
+
+		var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		packetText += 'Channel frequency (hex) = ' + byteArray.toString() + '\n';
+		var channelFrequency = 0;
+		for(var i=0;i<byteArray.length;i++) channelFrequency += parseInt(byteArray[i],16) * Math.pow(16,2*i) ;
+		packetText += 'Channel Frequency = ' + channelFrequency + ' MHz\n';		
+		ipnt+=2;
+		countHeaderBytes += 2;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + byteArray + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
+	    
+		var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		packetText += 'Channel flags = ' + byteArray.toString() + '\n';
+		var channelObj = parseChannel(byteArray);
+		packetText += JSON.stringify(channelObj,null,2) + '\n';
+		ipnt+=2;
+		countHeaderBytes += 2;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + byteArray + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
+	    }
+
+	    if(presentObj.FHSS){
+		console.log("You have FHSS but no code for it!!!!");
+	    }
+
+	    
 	    if(presentObj.dBmAntennaSignal){
 		var RSSI = packet.data.slice(ipnt,ipnt+1).toString("hex");
 		packetText += 'RSSI = ' + RSSI + '\n';
@@ -444,8 +510,11 @@ function nowTheRest(uploadFiles,request,response,next){
 		    packetText += 'RSSI = ' + RSSIval + ' dBm\n';
 		}
 		ipnt++;
+		countHeaderBytes += 1;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + RSSI + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
 	    }
-	    
+		
 	    if(presentObj.dBmAntennaNoise){
 		var Noise = packet.data.slice(ipnt,ipnt+1).toString("hex");
 		packetText += 'Noise = ' + Noise + '\n';
@@ -461,6 +530,9 @@ function nowTheRest(uploadFiles,request,response,next){
 		    packetText += 'Noise = ' + Noiseval + ' dBm\n';
 		}
 		ipnt++;
+		countHeaderBytes += 2;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + Noise + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
 	    }
 	    
 	    if(presentObj.lockQuality){
@@ -470,12 +542,30 @@ function nowTheRest(uploadFiles,request,response,next){
 		for(var i=0;i<byteArray.length;i++) Quality += parseInt(byteArray[i],16) * Math.pow(16,2*i) ;
 		packetText += 'Quality = ' + Quality + '\n';
 		ipnt+=2;
+		countHeaderBytes += 2;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + byteArray + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
+	    }
+
+	    if(presentObj.txAttenuation){
+		console.log("You have txAttenuation but no code for it!!!!");
+	    }
+
+	    if(presentObj.dBtxAttenuation){
+		console.log("You have dBtxAttenuation but no code for it!!!!");
+	    }
+
+	    if(presentObj.txPower){
+		console.log("You have txPower but no code for it!!!!");
 	    }
 
 	    if(presentObj.antenna){
 		var byteArray = []; for(var i=ipnt;i<ipnt+1;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
 		packetText += 'Antenna = ' + byteArray.toString() + '\n';
 		ipnt+=1;
+		countHeaderBytes += 1;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + byteArray + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
 	    }
 	    
 	    if(presentObj.dBantennaSignal){
@@ -497,18 +587,33 @@ function nowTheRest(uploadFiles,request,response,next){
 		    packetText += 'SNR = ' + SNRval + ' dBm\n';
 		}
 		ipnt++;
+		countHeaderBytes += 1;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + SNR + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
 	    }
 
+	    if(presentObj.dBantennaNoise){
+		console.log("You have dBantennaNoise but no code for it!!!!");
+	    }
+	    
+
 	    if(presentObj.rxFlags){
-		var skip = packet.data.slice(23,24).toString("hex");
-		ipnt++;	    
 		var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
 		packetText += 'Rx flags = ' + byteArray.toString() + '\n';
 		ipnt+=2;
+		countHeaderBytes += 2;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + byteArray + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
 	    }
+
+	    if(presentObj.channelPlus){
+		console.log("You have channelPlus but no code for it!!!!");
+	    }
+	    
 
 	    var mcsObj = {mcs:-1, nss:-1};
 	    var bandwidthObj = {bandwidthMHz:20};
+	    
 	    if(presentObj.VHT){
 		var byteArray = []; for(var i=ipnt;i<ipnt+12;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
 		packetText += 'VHT = ' + byteArray.toString() + '\n';
@@ -528,34 +633,87 @@ function nowTheRest(uploadFiles,request,response,next){
 		dataRate = VHTrates(bandwidthObj.bandwidthMHz,mcsObj.mcs,mcsObj.nss,GI);
 		packetText += 'Data rate is ' + dataRate + ' Mbps\n';
 		ipnt+=12;
+		countHeaderBytes += 12;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + byteArray + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
 	    }
+	    else if(!presentObj.VHT && presentObj.MCS){
+		var byteArray = []; for(var i=ipnt;i<ipnt+3;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		packetText += 'MCS = ' + byteArray.toString() + '\n';
+		var moreMCSObj = parseMCS2(byteArray);
+		packetText += 'MCS Object: \n';
+		packetText += JSON.stringify(moreMCSObj,null,2) + '\n';
+		mcsObj.mcs = moreMCSObj.mcsVal;
+		mcsObj.nss = moreMCSObj.STBCval;
+		ipnt+=3;
+		countHeaderBytes += 3;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + byteArray + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
+
+		//This is not going to be right, but try and find a way of skipping this next byte when needed..
+		ipnt++;
+		countHeaderBytes += 1;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + ' Skipping byte after MCS.' + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
+	    }
+		
 
 	    if(presentObj.vendorNSnext){
 		var byteArray = []; for(var i=ipnt;i<ipnt+3;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
 		packetText += 'vendor oui = ' + byteArray.toString() + '\n';
 		ipnt+=3;
+		countHeaderBytes += 3;		
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + byteArray + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
 		var byteArray = []; for(var i=ipnt;i<ipnt+1;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
 		packetText += 'vendor sub namespace = ' + byteArray.toString() + '\n';
 		ipnt+=1;
+		countHeaderBytes += 1;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + byteArray + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
 		var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
 		packetText += 'vendor data length = ' + byteArray.toString() + '\n';
 		ipnt+=2;
+		countHeaderBytes += 2;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + byteArray + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
 		var vendorDataLength = 0;
 		for(var i=0;i<byteArray.length;i++) vendorDataLength += parseInt(byteArray[i],16) * Math.pow(16,2*i) ;
 		packetText += 'vendor data length = ' + vendorDataLength + '\n';
 		var byteArray = []; for(var i=ipnt;i<ipnt+vendorDataLength;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
 		packetText += 'vendor data = ' + byteArray.toString() + '\n';
 		ipnt+=vendorDataLength;
-		
-		var byteArray = []; for(var i=ipnt;i<ipnt+4;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		packetText += 'Skipping 4 bytes = ' + byteArray.toString() + '\n';
-		ipnt+=4;
-		if(!presentObj.VHT){
-		    var byteArray = []; for(var i=ipnt;i<ipnt+4;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		    packetText += 'Skipping 4 more bytes = ' + byteArray.toString() + '\n';
-		    ipnt+=4;
-		}
+		countHeaderBytes += vendorDataLength;
+		packetText += '********* Up to byte ' + countHeaderBytes + ' of the header. ' + byteArray + '\n';
+		if(countHeaderBytes==skip1){ipnt++;countHeaderBytes++;}
 	    }
+		
+	    packetText += 'Total header bytes processed = ' + countHeaderBytes + '\n';
+	    packetText += 'Total header length = ' + headerLength + '\n';
+	    var needToSkip = headerLength - countHeaderBytes;
+	    if(needToSkip<0)needToSkip=0;
+	    packetText += 'Need to skip = ' + needToSkip + '\n';
+
+	    var byteArray = []; for(var i=ipnt;i<ipnt+needToSkip;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+	    packetText += 'Skipping ' + needToSkip + ' bytes = ' + byteArray.toString() + '\n';
+	    ipnt+=needToSkip;
+	    countHeaderBytes += needToSkip;
+	    
+
+	    /*/
+	    var byteArray = []; for(var i=ipnt;i<ipnt+4;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+	    packetText += 'Skipping 4 bytes = ' + byteArray.toString() + '\n';
+	    ipnt+=4;
+	    countHeaderBytes += 4;
+	    if(!presentObj.VHT){
+		var byteArray = []; for(var i=ipnt;i<ipnt+4;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		packetText += 'Skipping 4 more bytes = ' + byteArray.toString() + '\n';
+		ipnt+=4;
+		countHeaderBytes += 4;
+	    }
+	    //*/
+
+	    packetText += 'Total header bytes processed = ' + countHeaderBytes + '\n';
 	    
 	    packetDetails.type = '';
 	    var typeSubtype = packet.data.slice(ipnt,ipnt+1).toString("hex");
@@ -584,11 +742,13 @@ function nowTheRest(uploadFiles,request,response,next){
 	    packetDetails.receiverAddress = ''; for(var i=0;i<byteArray.length;i++) packetDetails.receiverAddress += byteArray[i] + '.';
 	    if(!allMACs.contains(packetDetails.receiverAddress))allMACs.push(packetDetails.receiverAddress);
 	    ipnt+=6;
-	    
-	    var byteArray = []; for(var i=ipnt;i<ipnt+6;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-	    packetDetails.transmitterAddress = ''; for(var i=0;i<byteArray.length;i++) packetDetails.transmitterAddress += byteArray[i] + '.';
-	    if(!allMACs.contains(packetDetails.transmitterAddress))allMACs.push(packetDetails.transmitterAddress);
-	    ipnt+=6;
+
+	    if(packetDetails.type != "Clear to Send"){
+		var byteArray = []; for(var i=ipnt;i<ipnt+6;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		packetDetails.transmitterAddress = ''; for(var i=0;i<byteArray.length;i++) packetDetails.transmitterAddress += byteArray[i] + '.';
+		if(!allMACs.contains(packetDetails.transmitterAddress))allMACs.push(packetDetails.transmitterAddress);
+		ipnt+=6;
+	    }
 
 	    if(fcObj.type==1){  //These are Control Frames.  I think that in general they do not have other addresses.\
 	    	packetDetails.BSSID = 'none';
@@ -624,160 +784,187 @@ function nowTheRest(uploadFiles,request,response,next){
 		    packetDetails.BSSID = packetDetails.transmitterAddress;
 		    ipnt+=6;
 		}
+	    }  //This is for management and data frames
 
-		packetText += 'Receiver Address = '       + packetDetails.receiverAddress + '\n';
-		packetText += 'Destination Address = '    + packetDetails.destinationAddress + '\n';
-		packetText += 'Transmitter Address = '    + packetDetails.transmitterAddress + '\n';
-		packetText += 'Source Address = '         + packetDetails.sourceAddress + '\n';
-		packetText += 'BSS Id = '                 + packetDetails.BSSID + '\n';
+	    packetText += 'Receiver Address = '       + packetDetails.receiverAddress + '\n';
+	    packetText += 'Destination Address = '    + packetDetails.destinationAddress + '\n';
+	    packetText += 'Transmitter Address = '    + packetDetails.transmitterAddress + '\n';
+	    packetText += 'Source Address = '         + packetDetails.sourceAddress + '\n';
+	    packetText += 'BSS Id = '                 + packetDetails.BSSID + '\n';
 
-		//There seems to be a reliable way of finding a "malformed packet"
-		if(packetDetails.receiverAddress.indexOf('....')>=0 && packetDetails.transmitterAddress.indexOf('....')>=0) packetDetails.type = 'Malformed packet';
+	    //There seems to be a reliable way of finding a "malformed packet"
+	    if(packetDetails.receiverAddress.indexOf('....')>=0 && packetDetails.transmitterAddress.indexOf('....')>=0) packetDetails.type = 'Malformed packet';
 
-		//Many of the packets on the network, like ARP, LLC, Ping, etc. all come from, or to, the DS.  If you really are interested only in Wi-Fi, you might be
-		//able to avoid those.  So make them a separate type of packet.  The ToDS and FromDS types.
+	    //Many of the packets on the network, like ARP, LLC, Ping, etc. all come from, or to, the DS.  If you really are interested only in Wi-Fi, you might be
+	    //able to avoid those.  So make them a separate type of packet.  The ToDS and FromDS types.
 
-		if(typeof packetDetails.type == 'undefined')packetDetails.type = '';
+	    if(typeof packetDetails.type == 'undefined')packetDetails.type = '';
 
-		if(packetDetails.type.indexOf('QoS')<0 &&
-		   packetDetails.type.indexOf('Data')<0
-		  ){
-		    if(fcFlagObj.fromDS) packetDetails.type = 'FromDS';
-		    if(fcFlagObj.toDS)   packetDetails.type = 'ToDS';
-		}
+	    if(packetDetails.type.indexOf('QoS')<0 &&
+	       packetDetails.type.indexOf('Data')<0
+	      ){
+		if(fcFlagObj.fromDS) packetDetails.type = 'FromDS';
+		if(fcFlagObj.toDS)   packetDetails.type = 'ToDS';
+	    }
 
 
+	    //This seems to be used most of the time, but not always.  There may be a better way to divide this up, but for now...
+	    if(packetDetails.type=="Block ACK"){
+		var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		packetText += 'Block ACK type = ' + byteArray.toString() + '\n';
+		ipnt+=2; 
+		var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		var SscObj = parseSSC(byteArray);
+		packetText += 'Block ACK Starting Sequence Control (SSC) = ' + byteArray.toString() + '\n';
+		packetText += 'SscObj = \n' + JSON.stringify(SscObj,null,2);
+		packetDetails.sequenceNumber = SscObj.SSC;
+		ipnt+=2;
+		var byteArray = []; for(var i=ipnt;i<ipnt+8;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		packetText += 'Block ACK Bitmap = ' + byteArray.toString() + '\n';
+		ipnt+=8;
+		var byteArray = []; for(var i=ipnt;i<ipnt+4;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		packetText += 'FCS = ' + byteArray.toString() + '\n';
+		ipnt+=4;
+	    }
+	    else if(packetDetails.type=="Clear to Send"){
+		var byteArray = []; for(var i=ipnt;i<ipnt+4;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		packetText += 'FCS = ' + byteArray.toString() + '\n';
+		packetDetails.sequenceNumber = byteArray.toString();  //Don't seem to have anything else to be used as a sequence number for these packets.
+		ipnt+=4;
+	    }
+	    else{
 		var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
 		packetText += 'FragSeq = ' + byteArray.toString() + '\n';
 		var fragObj = parseFrag(byteArray);
 		packetText += 'Fragment number = ' + fragObj.fragment + '\n';
 		packetText += 'Sequence number = ' + fragObj.sequence + '\n';
+		packetDetails.sequenceNumber = fragObj.sequence;
 		ipnt+=2;
+	    }
 
-		if(packetDetails.type=='QoS Data' ||
-		   packetDetails.type=='QoS Data + Contention Free ACK' ||
-		   packetDetails.type=='QoS Data + Contention Free Poll' ||
-		   packetDetails.type=='QoS Data + Contention Free ACK + Contention Free Poll' ||
-		   packetDetails.type=='NULL QoS Data' ||
-		   packetDetails.type=='NULL QoS Data + Contention Free Poll' ||
-		   packetDetails.type=='NULL QoS Data + Contention Free ACK + Contention Free Poll'
-		  ){
-		    var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		    packetText += 'QoS Control = ' + byteArray.toString() + '\n';
-		    var qosObj = parseQoS(byteArray);
-		    packetText += 'Qos Control Object:\n' + JSON.stringify(qosObj,null,2) + '\n';
-		    ipnt+=2;
-		    
-		    var byteArray = []; for(var i=ipnt;i<ipnt+8;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		    packetText += 'LLC = ' + byteArray.toString() + '\n';
-		    var llcObj = decodeLLC(byteArray);
-		    packetText += 'LLC decode\n' + JSON.stringify(llcObj,null,2) + '\n';
-		    //if(byteArray[6]=='88' && byteArray[7]=='8e'){
-		    if(llcObj.Type[0]=='88' && llcObj.Type[1]=='8e'){
-			packetText += 'LLC indicates that this is an EAPOL packet.\n';
-			packetDetails.type = 'EAPOL';
-			ipnt+=8;
-		    }
-		    if(llcObj.Type[0]=='08' && llcObj.Type[1]=='00'){
-			packetText += 'LLC indicates that this is an IPv4 packet.\n';
-			ipnt+=8;
-			var byteArray = []; for(var i=ipnt;i<ipnt+24;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-			var ipv4Obj = parseIpv4(byteArray);
-			packetText += 'IPv4 object:\n' + JSON.stringify(ipv4Obj,null,2) + '\n';
-			packetDetails.type = ipv4Obj.protocolName;
-			ipnt+=24;
-		    }
-		    if(llcObj.Type[0]=='08' && llcObj.Type[1]=='06'){
-			packetText += 'LLC indicates that this is an ARP packet.\n';
-			packetDetails.type = 'ARP';
-			ipnt+=8;
-		    }
-		    else{
-			ipnt+=8;
-		    }
-		}
-
-		else if(packetDetails.type=='Data'){
-		    var byteArray = []; for(var i=ipnt;i<ipnt+8;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		    packetText += 'CCMP Initialization Vector = ' + byteArray.toString() + '\n';
+	    if(packetDetails.type=='QoS Data' ||
+	       packetDetails.type=='QoS Data + Contention Free ACK' ||
+	       packetDetails.type=='QoS Data + Contention Free Poll' ||
+	       packetDetails.type=='QoS Data + Contention Free ACK + Contention Free Poll' ||
+	       packetDetails.type=='NULL QoS Data' ||
+	       packetDetails.type=='NULL QoS Data + Contention Free Poll' ||
+	       packetDetails.type=='NULL QoS Data + Contention Free ACK + Contention Free Poll'
+	      ){
+		var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		packetText += 'QoS Control = ' + byteArray.toString() + '\n';
+		var qosObj = parseQoS(byteArray);
+		packetText += 'Qos Control Object:\n' + JSON.stringify(qosObj,null,2) + '\n';
+		ipnt+=2;
+		
+		var byteArray = []; for(var i=ipnt;i<ipnt+8;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		packetText += 'LLC = ' + byteArray.toString() + '\n';
+		var llcObj = decodeLLC(byteArray);
+		packetText += 'LLC decode\n' + JSON.stringify(llcObj,null,2) + '\n';
+		//if(byteArray[6]=='88' && byteArray[7]=='8e'){
+		if(llcObj.Type[0]=='88' && llcObj.Type[1]=='8e'){
+		    packetText += 'LLC indicates that this is an EAPOL packet.\n';
+		    packetDetails.type = 'EAPOL';
 		    ipnt+=8;
-		    var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-		    packetText += 'Data = ' + byteArray.toString() + '\n';
-		    ipnt+=2;
 		}
-		
-		else if(packetDetails.type=='Probe request' || packetDetails.type=='Probe response'){
-		    //Get the tagged parameters.  Haven't written this code yet.
+		if(llcObj.Type[0]=='08' && llcObj.Type[1]=='00'){
+		    packetText += 'LLC indicates that this is an IPv4 packet.\n';
+		    ipnt+=8;
+		    var byteArray = []; for(var i=ipnt;i<ipnt+24;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		    var ipv4Obj = parseIpv4(byteArray);
+		    packetText += 'IPv4 object:\n' + JSON.stringify(ipv4Obj,null,2) + '\n';
+		    packetDetails.type = ipv4Obj.protocolName;
+		    ipnt+=24;
 		}
-		else if(packetDetails.type=='Beacon'){
-		    if(!fcFlagObj.protectedData){
-			var Beacon = {fixed:{}, tagged:{}};
-			var byteArray = []; for(var i=ipnt;i<ipnt+12;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-			Beacon.fixed.bytes = byteArray;
-			ipnt+=12;
-			//The remaining packets are the tagged packets.
-			var remain = packet.data.length - ipnt;
-			if(flagsObj.FCS) remain -= 4;  //If there is an FCS, the last 4 bytes are that.
-			packetText += 'There are ' + remain + ' bytes of tagged packets in this beacon. \n';
-			var byteArray = []; for(var i=ipnt;i<ipnt+remain;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-			Beacon.tagged.bytes = byteArray;
-			ipnt+=remain;
-			Beacon.tagged = decodeBeaconTagged(Beacon);
-			packetText += 'Found beacon ' + JSON.stringify(Beacon.tagged.tags,null,2);
-			var csa = Beacon.tagged.tags.locate("Channel Switch Announcement");
-			if(csa>=0){
-			    var toChannel = parseInt(Beacon.tagged.tags[csa].bytes[1],16);
-			    var dsp = Beacon.tagged.tags.locate("DS Parameter Set");
-			    var fromChannel = null;
-			    if(dsp>=0) fromChannel = parseInt(Beacon.tagged.tags[dsp].bytes[0],16);
-			    packetText += 'Channel Switch Announcement going to channel ' + toChannel + ' from ' + fromChannel + '. \n';
-			}
-		    }
-		    else if(fcFlagObj.protectedData){
-			//This stuff is WEP stuff.
-			var Beacon={};
-			packetText += 'This packet is WEP protected.  See the protectedData flag above. \n';
-			var byteArray = []; for(var i=ipnt;i<ipnt+3;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-			Beacon.wepParameters = byteArray;
-			packetText += 'WEP parameters are ' + Beacon.wepParameters + '\n';
-			ipnt+=3;
-			var byteArray = []; for(var i=ipnt;i<ipnt+1;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-			Beacon.keyIndex = byteArray;
-			packetText += 'Key Index is ' + Beacon.keyIndex + '\n';
-			ipnt+=1;
-			//The remaining packets are the data.
-			var remain = packet.data.length - ipnt;
-			remain -= 4;  //The last 4 bytes are the ICV
-			var byteArray = []; for(var i=ipnt;i<ipnt+remain;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-			Beacon.data = byteArray;
-			ipnt+=remain;
-			var byteArray = []; for(var i=ipnt;i<ipnt+4;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
-			Beacon.ICV = byteArray;		    		    
-			packetText += 'ICV is ' + Beacon.ICV + '\n';
-			packetText += 'There are ' + remain + ' bytes of protected data:  ' + Beacon.data + '\n';
-		    }
+		if(llcObj.Type[0]=='08' && llcObj.Type[1]=='06'){
+		    packetText += 'LLC indicates that this is an ARP packet.\n';
+		    packetDetails.type = 'ARP';
+		    ipnt+=8;
 		}
+		else{
+		    ipnt+=8;
+		}
+	    }
 
-		else if(packetDetails.type=='Action frames'){
-
-		    var categoryCode = packet.data.slice(ipnt,ipnt+1).toString("hex");
-		    packetText += 'categoryCode = ' + categoryCode + '\n';
-		    var category = decodeCategory(categoryCode);
-		    packetText += 'Category = ' + category + '\n';
-		    packetDetails.category = category;
-		    ipnt++;
-		    
-		    //Ouch.  There are different action codes for each of these categories.  Might just have to pick the interesting ones for now.
-		    
-		    var actionCode = packet.data.slice(ipnt,ipnt+1).toString("hex");
-		    packetText += 'actionCode = ' + actionCode + '\n';
-		    var action = decodeActionCode(categoryCode,actionCode);
-		    packetText += 'Action= ' + action + '\n';
-		    packetDetails.action = action;
-		    ipnt++;
+	    else if(packetDetails.type=='Data'){
+		var byteArray = []; for(var i=ipnt;i<ipnt+8;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		packetText += 'CCMP Initialization Vector = ' + byteArray.toString() + '\n';
+		ipnt+=8;
+		var byteArray = []; for(var i=ipnt;i<ipnt+2;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		packetText += 'Data = ' + byteArray.toString() + '\n';
+		ipnt+=2;
+	    }
+	    
+	    else if(packetDetails.type=='Probe request' || packetDetails.type=='Probe response'){
+		//Get the tagged parameters.  Haven't written this code yet.
+	    }
+	    else if(packetDetails.type=='Beacon'){
+		if(!fcFlagObj.protectedData){
+		    var Beacon = {fixed:{}, tagged:{}};
+		    var byteArray = []; for(var i=ipnt;i<ipnt+12;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		    Beacon.fixed.bytes = byteArray;
+		    ipnt+=12;
+		    //The remaining packets are the tagged packets.
+		    var remain = packet.data.length - ipnt;
+		    if(flagsObj.FCS) remain -= 4;  //If there is an FCS, the last 4 bytes are that.
+		    packetText += 'There are ' + remain + ' bytes of tagged packets in this beacon. \n';
+		    var byteArray = []; for(var i=ipnt;i<ipnt+remain;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		    Beacon.tagged.bytes = byteArray;
+		    ipnt+=remain;
+		    Beacon.tagged = decodeBeaconTagged(Beacon);
+		    packetText += 'Found beacon ' + JSON.stringify(Beacon.tagged.tags,null,2);
+		    var csa = Beacon.tagged.tags.locate("Channel Switch Announcement");
+		    if(csa>=0){
+			var toChannel = parseInt(Beacon.tagged.tags[csa].bytes[1],16);
+			var dsp = Beacon.tagged.tags.locate("DS Parameter Set");
+			var fromChannel = null;
+			if(dsp>=0) fromChannel = parseInt(Beacon.tagged.tags[dsp].bytes[0],16);
+			packetText += 'Channel Switch Announcement going to channel ' + toChannel + ' from ' + fromChannel + '. \n';
+		    }
 		}
+		else if(fcFlagObj.protectedData){
+		    //This stuff is WEP stuff.
+		    var Beacon={};
+		    packetText += 'This packet is WEP protected.  See the protectedData flag above. \n';
+		    var byteArray = []; for(var i=ipnt;i<ipnt+3;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		    Beacon.wepParameters = byteArray;
+		    packetText += 'WEP parameters are ' + Beacon.wepParameters + '\n';
+		    ipnt+=3;
+		    var byteArray = []; for(var i=ipnt;i<ipnt+1;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		    Beacon.keyIndex = byteArray;
+		    packetText += 'Key Index is ' + Beacon.keyIndex + '\n';
+		    ipnt+=1;
+		    //The remaining packets are the data.
+		    var remain = packet.data.length - ipnt;
+		    remain -= 4;  //The last 4 bytes are the ICV
+		    var byteArray = []; for(var i=ipnt;i<ipnt+remain;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		    Beacon.data = byteArray;
+		    ipnt+=remain;
+		    var byteArray = []; for(var i=ipnt;i<ipnt+4;i++)byteArray.push(packet.data.slice(i,i+1).toString("hex"));
+		    Beacon.ICV = byteArray;		    		    
+		    packetText += 'ICV is ' + Beacon.ICV + '\n';
+		    packetText += 'There are ' + remain + ' bytes of protected data:  ' + Beacon.data + '\n';
+		}
+	    }
+
+	    else if(packetDetails.type=='Action frames'){
+
+		var categoryCode = packet.data.slice(ipnt,ipnt+1).toString("hex");
+		packetText += 'categoryCode = ' + categoryCode + '\n';
+		var category = decodeCategory(categoryCode);
+		packetText += 'Category = ' + category + '\n';
+		packetDetails.category = category;
+		ipnt++;
 		
-	    } //This is for management and data frames
+		//Ouch.  There are different action codes for each of these categories.  Might just have to pick the interesting ones for now.
+		
+		var actionCode = packet.data.slice(ipnt,ipnt+1).toString("hex");
+		packetText += 'actionCode = ' + actionCode + '\n';
+		var action = decodeActionCode(categoryCode,actionCode);
+		packetText += 'Action= ' + action + '\n';
+		packetDetails.action = action;
+		ipnt++;
+	    }
+	    
 
 
 	    var returnPacket = {
@@ -802,6 +989,7 @@ function nowTheRest(uploadFiles,request,response,next){
 		receiverAddress:packetDetails.receiverAddress,
 		destinationAddress:packetDetails.destinationAddress,
 		bssID:packetDetails.BSSID,
+		sequenceNumber:packetDetails.sequenceNumber,
 		csa: {tagID:csa, from: fromChannel, to: toChannel}
 	    };
 
@@ -869,7 +1057,7 @@ function nowTheRest(uploadFiles,request,response,next){
 		
 		returnFields.push(returnPacket);
 	    }
-	    if(packetNumber== -4177) console.log(packetText);     //Write out packet here.
+	    if(packetNumber== 2) console.log(packetText);     //Write out packet here.
 	    allPackets.push(returnPacket);
 	}
     });
@@ -1518,7 +1706,7 @@ function parseFlags(flags)
     var byte1 = flags;
     var bits1 = byte2bits(parseInt(byte1,16));
     if(bits1[7]=='1')retObj.CFP = true; else retObj.CFP = false;
-    if(bits1[6]=='1')retObj.LongPreamble = false; else retObj.LongPreamble = true;
+    if(bits1[6]=='1')retObj.LongPreamble = true; else retObj.LongPreamble = false;
     if(bits1[5]=='1')retObj.WEP = true; else retObj.WEP = false;
     if(bits1[4]=='1')retObj.Fragmentation = true; else retObj.Fragmentation = false;
     if(bits1[3]=='1')retObj.FCS = true; else retObj.FCS = false;
@@ -1594,6 +1782,7 @@ function decodeSubtype(typeSubtype)
     if(decimal ==  11) ret = 'Authentication';
     if(decimal ==  12) ret = 'Deauthentication';
     if(decimal ==  13) ret = 'Action frames';
+    if(decimal ==  14) ret = 'Action No Ack';
     if(decimal ==  24) ret = 'Block ACK Request';
     if(decimal ==  25) ret = 'Block ACK';
     if(decimal ==  26) ret = 'Power-Save Poll';
@@ -1674,6 +1863,39 @@ function parseMCS(vht)
     retObj.nss = nss;
     
     return retObj;
+}
+//........................................
+function parseMCS2(mcs)
+{
+    var theObj = {};
+
+    var byte1 = mcs[0];
+    var bits1 = byte2bits(parseInt(byte1,16));
+    if(bits1[7]=='1')theObj.Bandwidth=true; else theObj.Bandwidth=false;
+    if(bits1[6]=='1')theObj.MCS=true;       else theObj.MCS=false;
+    if(bits1[5]=='1')theObj.GI=true;        else theObj.GI=false;
+    if(bits1[4]=='1')theObj.Format=true;    else theObj.Format=false;
+    if(bits1[3]=='1')theObj.FEC=true;       else theObj.FEC=false;
+    if(bits1[2]=='1')theObj.STBC=true;      else theObj.STBC=false;
+    if(bits1[1]=='1')theObj.NumExtStreams=true;      else theObj.NumExtStreams=false;
+    
+    var byte1 = mcs[1];
+    var bits1 = byte2bits(parseInt(byte1,16));
+    var BW = 0;
+    BW = 2*parseInt(bits1[6]) + parseInt(bits1[7]);
+    theObj.BWval = BW;
+    var GI = parseInt(bits1[5]);
+    theObj.GIval = GI;
+    var Format = parseInt(bits1[4]);
+    theObj.FormatVal = Format;
+    var STBC = 2*parseInt(bits1[1]) + parseInt(bits1[2]);
+    theObj.STBCval = STBC;
+
+    var byte1 = mcs[2];
+    var mcsVal = parseInt(byte1,16);
+    theObj.mcsVal = mcsVal;
+
+    return theObj;   
 }
 //........................................
 function VHTrates(BW,MCS,streams,GI)
@@ -2383,6 +2605,7 @@ function parseIpv4(byteArray)
     retObj.protocol = parseInt(byteArray[9],16);
     if(retObj.protocol==1) retObj.protocolName = 'ICMP';
     if(retObj.protocol==2) retObj.protocolName = 'IGMP';
+    if(retObj.protocol==6) retObj.protocolName = 'TCP';
 
     return retObj;
 }
@@ -2404,6 +2627,27 @@ function parseDuration(byteArray)
 
     return microsec;
 
+}
+//...............................................
+function parseSSC(byteArray)
+{
+    var SscObj = {};
+    
+    var byte1 = byteArray[0];
+    var bits1 = byte2bits(parseInt(byte1,16));
+    var Fragment = 0;
+    for(var i=7;i>=4;i--) Fragment += Math.pow(2,7-i)*parseInt(bits1[i]);
+    SscObj.Fragment = Fragment;
+
+    var SSC = 0;
+    for(var i=3;i>=0;i--) SSC += Math.pow(2,3-i)*parseInt(bits1[i]);
+    var byte2 = byteArray[1];
+    var bits2 = byte2bits(parseInt(byte2,16));
+    for(var i=7;i>=0;i--) SSC += Math.pow(2,11-i)*parseInt(bits2[i]);
+    SscObj.SSC = SSC;
+
+    
+    return SscObj;
 }
 //...............................................
 function decodeBeaconTagged(Beacon)
@@ -2457,3 +2701,4 @@ function tagNumberToName(tagNumber)
     return tagName;
 }
     
+//...................................................
